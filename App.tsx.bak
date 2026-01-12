@@ -10,10 +10,8 @@ import { LevelHistoryModal } from './components/LevelHistoryModal';
 import { AuthButton } from './components/AuthButton';
 import { ApiKeysModal } from './components/ApiKeysModal';
 import { GameHistorySidebar } from './components/GameHistorySidebar';
-import { ContestantSettingsModal } from './components/ContestantSettingsModal';
-import { GameSettingsModal } from './components/GameSettingsModal';
 import { createChatSession, getChatResponse } from './services/aiService';
-import { buildScoringPrompt, DEFAULT_GAME_RULES } from './services/prompts';
+import { buildScoringPrompt } from './services/prompts';
 import { initializeAuth, handleAuthCallback, subscribeToAuth, AuthState } from './services/auth';
 
 interface LevelReport {
@@ -52,11 +50,6 @@ const App: React.FC = () => {
   const [levelReports, setLevelReports] = useState<LevelReport[]>([]);
   const [showScoreboard, setShowScoreboard] = useState(true);
   const [selectedContestant, setSelectedContestant] = useState<Contestant | null>(null);
-
-  // Settings state
-  const [gameRules, setGameRules] = useState(DEFAULT_GAME_RULES);
-  const [isGameSettingsOpen, setIsGameSettingsOpen] = useState(false);
-  const [contestantToEdit, setContestantToEdit] = useState<Contestant | null>(null);
 
   // Auth state
   const [auth, setAuth] = useState<AuthState>({
@@ -120,7 +113,7 @@ const App: React.FC = () => {
       let chat = chatSessions.current[contestant.id];
 
       if (!chat) {
-        chat = createChatSession(contestant.aiConfig, contestant.persona, gameRules);
+        chat = createChatSession(contestant.aiConfig, contestant.persona);
         chatSessions.current[contestant.id] = chat;
       }
 
@@ -289,7 +282,7 @@ const App: React.FC = () => {
     const promises = activeContestants.map(async (c) => {
       let chat = chatSessions.current[c.id];
       if (!chat) {
-        chat = createChatSession(c.aiConfig, c.persona, gameRules);
+        chat = createChatSession(c.aiConfig, c.persona);
         chatSessions.current[c.id] = chat;
       }
 
@@ -317,27 +310,6 @@ const App: React.FC = () => {
   const handleSelectSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
     setIsGameHistoryOpen(false);
-  };
-
-  // Open contestant settings
-  const handleOpenContestantSettings = (contestant: Contestant) => {
-    setContestantToEdit(contestant);
-  };
-
-  // Save contestant settings
-  const handleSaveContestantSettings = (id: string, updates: Partial<Contestant>) => {
-    setContestants(prev =>
-      prev.map(c => c.id === id ? { ...c, ...updates } : c)
-    );
-    // Clear chat session so it recreates with new settings
-    delete chatSessions.current[id];
-  };
-
-  // Save game rules
-  const handleSaveGameRules = (rules: string) => {
-    setGameRules(rules);
-    // Clear all chat sessions so they recreate with new rules
-    chatSessions.current = {};
   };
 
   return (
@@ -370,18 +342,6 @@ const App: React.FC = () => {
 
           {/* Right: Settings & Auth */}
           <div className="flex items-center gap-2">
-            {/* Game Settings */}
-            <button
-              onClick={() => setIsGameSettingsOpen(true)}
-              className="btn btn-ghost btn-circle text-slate-400 hover:text-purple-400"
-              title="Game Settings"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-            {/* Toggle Scoreboard */}
             <button
               onClick={() => setShowScoreboard(!showScoreboard)}
               className={`btn btn-ghost btn-circle ${showScoreboard ? 'text-purple-400' : 'text-slate-500'}`}
@@ -418,7 +378,6 @@ const App: React.FC = () => {
             onEliminate={handleEliminate}
             onViewAnswer={handleViewAnswer}
             onUpdateScore={handleUpdateScore}
-            onOpenSettings={handleOpenContestantSettings}
           />
         </div>
 
@@ -492,21 +451,6 @@ const App: React.FC = () => {
         onClose={() => setIsGameHistoryOpen(false)}
         onSelectSession={handleSelectSession}
         currentSessionId={currentSessionId}
-      />
-
-      {/* Contestant Settings Modal */}
-      <ContestantSettingsModal
-        contestant={contestantToEdit}
-        onClose={() => setContestantToEdit(null)}
-        onSave={handleSaveContestantSettings}
-      />
-
-      {/* Game Settings Modal */}
-      <GameSettingsModal
-        isOpen={isGameSettingsOpen}
-        onClose={() => setIsGameSettingsOpen(false)}
-        gameRules={gameRules}
-        onSave={handleSaveGameRules}
       />
 
       {/* Selected Contestant Answer Overlay */}

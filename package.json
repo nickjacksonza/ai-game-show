@@ -1,7 +1,7 @@
 {
-  "name": "gemini-game-show",
+  "name": "ai-game-show",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
+    "openai": "^4.77.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
