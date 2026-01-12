@@ -12,9 +12,11 @@ import { ApiKeysModal } from './components/ApiKeysModal';
 import { GameHistorySidebar } from './components/GameHistorySidebar';
 import { ContestantSettingsModal } from './components/ContestantSettingsModal';
 import { GameSettingsModal } from './components/GameSettingsModal';
+import { SetupPage } from './components/SetupPage';
 import { createChatSession, getChatResponse } from './services/aiService';
 import { buildScoringPrompt, DEFAULT_GAME_RULES } from './services/prompts';
 import { initializeAuth, handleAuthCallback, subscribeToAuth, AuthState } from './services/auth';
+import { ProviderConfigs, loadProviderConfigs, DEFAULT_PROVIDER_CONFIGS } from './services/providerConfig';
 
 interface LevelReport {
   level: number;
@@ -22,7 +24,13 @@ interface LevelReport {
   timestamp: string;
 }
 
+type GameStatus = 'setup' | 'active' | 'ended';
+
 const App: React.FC = () => {
+  // Game status - start in setup mode
+  const [gameStatus, setGameStatus] = useState<GameStatus>('setup');
+  const [providerConfigs, setProviderConfigs] = useState<ProviderConfigs>(DEFAULT_PROVIDER_CONFIGS);
+
   // Initialize contestants with new status field
   const [contestants, setContestants] = useState<Contestant[]>(() =>
     DEFAULT_PERSONAS.slice(0, 9).map((persona) => ({
@@ -120,7 +128,17 @@ const App: React.FC = () => {
       let chat = chatSessions.current[contestant.id];
 
       if (!chat) {
-        chat = createChatSession(contestant.aiConfig, contestant.persona, gameRules);
+        // Get API key from provider config if not set per-contestant
+        const providerConfig = providerConfigs[contestant.aiConfig.provider];
+        const aiConfigWithAuth = {
+          ...contestant.aiConfig,
+          auth: {
+            ...contestant.aiConfig.auth,
+            apiKey: contestant.aiConfig.auth.apiKey || providerConfig?.apiKey || '',
+            baseUrl: contestant.aiConfig.auth.baseUrl || providerConfig?.baseUrl,
+          },
+        };
+        chat = createChatSession(aiConfigWithAuth, contestant.persona, gameRules);
         chatSessions.current[contestant.id] = chat;
       }
 
@@ -289,7 +307,17 @@ const App: React.FC = () => {
     const promises = activeContestants.map(async (c) => {
       let chat = chatSessions.current[c.id];
       if (!chat) {
-        chat = createChatSession(c.aiConfig, c.persona, gameRules);
+        // Get API key from provider config if not set per-contestant
+        const providerConfig = providerConfigs[c.aiConfig.provider];
+        const aiConfigWithAuth = {
+          ...c.aiConfig,
+          auth: {
+            ...c.aiConfig.auth,
+            apiKey: c.aiConfig.auth.apiKey || providerConfig?.apiKey || '',
+            baseUrl: c.aiConfig.auth.baseUrl || providerConfig?.baseUrl,
+          },
+        };
+        chat = createChatSession(aiConfigWithAuth, c.persona, gameRules);
         chatSessions.current[c.id] = chat;
       }
 
@@ -340,21 +368,71 @@ const App: React.FC = () => {
     chatSessions.current = {};
   };
 
+  // Start game from setup page
+  const handleStartGame = (
+    setupContestants: Contestant[],
+    setupGameRules: string,
+    setupProviderConfigs: ProviderConfigs
+  ) => {
+    setContestants(setupContestants);
+    setGameRules(setupGameRules);
+    setProviderConfigs(setupProviderConfigs);
+    chatSessions.current = {};
+    setGameStatus('active');
+  };
+
+  // Return to setup
+  const handleReturnToSetup = () => {
+    setGameStatus('setup');
+    setCurrentRound(1);
+    setRounds([]);
+    setCurrentQuestion(null);
+    setScoresLocked(false);
+    chatSessions.current = {};
+    setContestants(prev =>
+      prev.map(c => ({
+        ...c,
+        currentAnswer: '',
+        status: 'idle' as ContestantStatus,
+        score: 0,
+        eliminated: false,
+        eliminatedInRound: undefined,
+      }))
+    );
+  };
+
+  // Show setup page if in setup mode
+  if (gameStatus === 'setup') {
+    return <SetupPage onStartGame={handleStartGame} />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col stage-lights">
       {/* Header */}
       <header className="relative z-10 pt-4 pb-2 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Left: Menu */}
-          <button
-            onClick={() => setIsGameHistoryOpen(true)}
-            className="btn btn-ghost btn-circle"
-            title="Game History"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          {/* Left: Back to Setup & Menu */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReturnToSetup}
+              className="btn btn-ghost btn-sm gap-2 text-slate-400 hover:text-purple-400"
+              title="Back to Setup"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Setup
+            </button>
+            <button
+              onClick={() => setIsGameHistoryOpen(true)}
+              className="btn btn-ghost btn-circle"
+              title="Game History"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
 
           {/* Center: Title */}
           <div className="text-center flex-1">
