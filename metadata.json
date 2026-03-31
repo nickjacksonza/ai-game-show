@@ -1,0 +1,6 @@
+{
+  "name": "Gemini Game Show",
+  "description": "An AI Game Show where a human Quizmaster challenges three Gemini-powered contestants with distinct personalities.",
+  "version": "1.0.0",
+  "requestFramePermissions": []
+}
